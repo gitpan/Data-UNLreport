@@ -1,5 +1,8 @@
-Data::UNLreport version 1.03
+Data::UNLreport version 1.04
 ======================
+Author: Jacob Salomon
+        jakesalomon@yahoo.com
+
 
 INSTALLATION
 
@@ -303,6 +306,16 @@ that (once you have the .pm in your INC path or current directory),
 type:
     $ perldoc UNLreport
 
--- Jacob Salomon
-   jakesalomon@yahoo.com
+--------------------------------------------------------------------------
+Bug Fixes:
+1.03 -> 1.04:
+1.  If a columns contains both numeric and character data, the data
+    column is printed at the maximume character width, even if some
+    decimal data in the same column is wider.
+2.  A duplicated typo in some patterns had the ^ (for start of string)
+    after the optional sign for decimal and integer patterns.  Thanks
+    to John Altom at Telcordia for pointing this out to me.
+3.  1.03 had failed to account for numeric data with a + sign; it was being
+    treated like strings.  It is now recognized as part of the numeric
+    pattern, although the + sign will not be counted into the columns width.
 ========================================================================

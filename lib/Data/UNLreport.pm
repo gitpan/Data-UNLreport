@@ -22,14 +22,14 @@ our @ISA = qw(Exporter);
 #
 #our @EXPORT = qw( );
 
-our $VERSION = '1.03';
+our $VERSION = '1.04';
 our $ABSTRACT = 'Formats delimited column data into uniform column sizes';
 
 # Patterns I will use to determine the data type of column data:
 #
 my $white = '\s+';      # White-space pattern (routine)
-my $int_pattern = '-?^\d+$';        # Integer pattern, signed
-my $dec_pattern = '-?^\d+\.\d*$';   # Decimal Number pattern, signed
+my $int_pattern = '^[-+]?\d+$';     # Integer pattern, optionally signed
+my $dec_pattern = '^[-+]?\d+\.\d*$'; # Decimal Number pattern, signed (opt)
 my $hex_pattern = '^[A-Fa-f0-9]+$'; # Hex number w/o the 0x prefix
 my $zhx_pattern = '^0[xX][A-Fa-f0-9]+$'; # Hex number with 0x prefix
 
@@ -258,9 +258,15 @@ sub check_col_widths
     elsif ($split_ref->[$lc] =~ $dec_pattern)
     { # If decimal, check for most decimal places and whole numbers
       #
-      my $whole_part = 0; my $decimal_part = 0 ;
+      my ($whole_part, $decimal_part) = (0, 0);
       ($whole_part, $decimal_part) = split('\.', $split_ref->[$lc]);
 
+      # If there is a + sign in there, it will not print with the
+      # printf call but its presence my skew the column width, if it
+      # happens to be the widest column alredy.  we want to lose it so
+      # that the + does not get counted into the length.
+      #
+      if (substr($whole_part, 0, 1) eq '+') { $whole_part =~ s/^\+// ;}
       if ( ($col_whole = length($whole_part))
                        > $pfile->{max_wholes}[$lc])
       { $pfile->{max_wholes}[$lc] = $col_whole; }   # New widest whole
@@ -269,15 +275,18 @@ sub check_col_widths
                       > $pfile->{max_decimals}[$lc])
       {  $pfile->{max_decimals}[$lc] = $col_dec;}   # New widest decimal
 
-      # Width of widest decimal, so far, is
-      # width of widest whole part + width of widest decimal part
+      # Width of widest decimal, so far, is:
+      # width of widest whole part
+      # + width of widest decimal part
       # + 1 for the decimal point.
+      # (Note: I am calculating and using $col_wid differently from the way
+      # I use it for string and integer data.)
       #
-      my $new_dec_width = $pfile->{max_wholes}[$lc]
-                        + $pfile->{max_decimals}[$lc]
-                        + 1;  # What is total width of these maxima?
-      if ($new_dec_width > $pfile->{max_width}[$lc])
-      { $pfile->{max_width}[$lc] = $new_dec_width; }
+      $col_wid = $pfile->{max_wholes}[$lc]
+               + $pfile->{max_decimals}[$lc]
+               + 1;  # What is total width of these maxima?
+      if ($col_wid > $pfile->{max_width}[$lc])
+      { $pfile->{max_width}[$lc] = $col_wid; }
     }
     else
     { # Neither decimal nor integer be: Must be a string

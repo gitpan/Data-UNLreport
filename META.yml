@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Data-UNLreport
-version:            1.03
+version:            1.04
 abstract:           Formats column-oriented data into uniform column sizes
 author:
     - Jacob Salomon <jakesalomon@yahoo.com>
