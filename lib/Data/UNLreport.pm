@@ -1,7 +1,7 @@
 # This file contains package Data::UNLreport, along with a retinue of
 # utility functions
 
-use 5.010001;
+#use 5.010001;
 use strict;
 use warnings;
 
@@ -22,7 +22,7 @@ our @ISA = qw(Exporter);
 #
 #our @EXPORT = qw( );
 
-our $VERSION = '1.04';
+our $VERSION = '1.07';
 our $ABSTRACT = 'Formats delimited column data into uniform column sizes';
 
 # Patterns I will use to determine the data type of column data:
@@ -81,7 +81,7 @@ sub new
   $self->{out_delim} = '|';     # Reasonable for out to mimic in
   $self->{out_file} = "(STDOUT)";   # Default output file.
   $self->{fdesc}     = \*STDOUT; # Default output file descriptor.
-  $self->{in_split}  = '\|';    # Escape it, since | is a metacharacter
+  #$self->{in_split}  = '\|';    # Escape it, since | is a metacharacter
   $self->{n_lines} = 0;         # No lines parsed yet
   $self->{max_width}[0]    = 0; # Member arrays for column width
   $self->{max_decimals}[0] = 0; # comparisons.  THis is decimal places
@@ -164,13 +164,40 @@ sub has_end_delim
   $self->{has_end_delim} = shift(@_) if @_; # No param: Don't set
   return $self->{has_end_delim};
 }
+#-----------------------------------------------------------------------
 
+# Method: chomp_delim() - Removes the delimiter character from the end
+# of the input line, as many as appear there.
+#
+# Parameters:
+# - (Implicit) Ref to a UNLreort object (ie parsed file)
+# - The line itself, (Probably already chomped by the caller)
+# Returns:
+# - The same line, minus the delibiter(s) at the end of the line
+#
+sub chomp_delim
+{
+  my $self = shift(@_);
+  my $rline = shift(@_);    # Get the line string
+  chomp($rline);            #(Probably not necessary; just being thorough)
+
+  # Plan: As long as we keep finding an input delimiter at the end of the
+  # line (note the fairly ugly "while" condition), keep chopping it off
+  #
+  while (substr($rline, (length($rline) - 1), 1) eq $self->{in_delim})
+  { chop($rline); }         #(Hey, there's still life in the chop function!)
+
+  return($rline);
+}
+#-----------------------------------------------------------------------
+#
 # Method UNLreport::+ to add a raw line into the parsed-file list
 #
 sub UNL_add_line
 {
   my $self     = shift(@_); # Ref to the UNLreport object
   my $one_line = shift(@_); # Get the actual line string to be appended
+  $one_line = $self->chomp_delim($one_line);    # Lose trailing delimiters
   
   # Parse the line and calculate basic info about it.
   #
@@ -181,8 +208,8 @@ sub UNL_add_line
   $self->{n_lines}++;   # Tally up line count
   return $self->{n_lines};
 }
-
-#
+#
+#-----------------------------------------------------------------------
 # Method UNLreport::<< to add a parsed line into the parsed file list
 # Parameters:
 # o (Implicit) reference to the UNLreport file object
@@ -309,12 +336,15 @@ sub print
 
   for ($lc = 0; $lc < $self->{n_lines}; $lc++)
   {
-    my $cur_col;
+    my $out_buf = "";                   # Buffer for output line
+    my $col_buf = "";                   # Buffer to format 1 column
+    my $cur_col;                        # Current column number within line
     my $cur_p_line = $self->{parsed_line}[$lc]; # ->Line object
     my $split_ref = $cur_p_line->{split_line};  # -> Array of cols
     if (! $cur_p_line->{has_delims})    # If line has no delimiters
     {
       #printf($self->{fdesc} "%s\n", $split_ref->[0]);
+      $split_ref->[0] =~ s/\s+$//;      # Trim trailing white-spaces
       printf {$self->{fdesc}} ("%s\n", $split_ref->[0]);
                                         # Just print the line as is
       next;                             # and go the next parsed line
@@ -325,11 +355,11 @@ sub print
     {  # One column per round in this loop
       if ($cur_p_line->{type}[$cur_col] eq "s")
       {
-        #printf($self->{fdesc} "%-*s%s",
-        printf {$self->{fdesc}} ("%-*s%s",
-               $self->{max_width}[$cur_col],
-               $split_ref->[$cur_col],
-               $self->{out_delim});
+        $col_buf = sprintf ("%-*s%s",
+                            $self->{max_width}[$cur_col],
+                            $split_ref->[$cur_col],
+                            $self->{out_delim});
+        $out_buf .= $col_buf;           # Concatenate column to line
       }
       else
       { # Else, it is a numeric type - either d or f. I won't even look
@@ -340,31 +370,37 @@ sub print
           # intger at widest width with [default] right justification
           #
           #printf($self->{fdesc} "%*d%s",
-          printf {$self->{fdesc}} ("%*d%s",
-                 $self->{max_width}[$cur_col],
-                 $split_ref->[$cur_col],
-                 $self->{out_delim});
+          $col_buf = sprintf ("%*d%s",
+                              $self->{max_width}[$cur_col],
+                              $split_ref->[$cur_col],
+                              $self->{out_delim});
         }
         else
         { # If even 1 row had decimal places in this column, format
           # this column accordingly for all rows.
           #
           #printf("%*.*f%s",
-          printf {$self->{fdesc}} ("%*.*f%s",
-                 $self->{max_width}[$cur_col],
-                 $self->{max_decimals}[$cur_col],
-                 $split_ref->[$cur_col],
-                 $self->{out_delim});
+          $col_buf = sprintf ("%*.*f%s",
+                              $self->{max_width}[$cur_col],
+                              $self->{max_decimals}[$cur_col],
+                              $split_ref->[$cur_col],
+                              $self->{out_delim});
         }
+        $out_buf .= $col_buf;           # Concatenate column to line
       }
     }   # End loop for one row
-    print {$self->{fdesc}} "\n";    # Line feed after filling the line
+
+    # Above loop filled an output line.  Now trim it off (just in case)
+    # and print it.
+    #
+    $out_buf =~ s/\s+$//;      # Trim trailing white-spaces
+    printf {$self->{fdesc}} ("%s\n", $out_buf);
   } # End loop for whole set of parsed lines
 }   # End method print()
 #
 # package UNLreport::Line:
 # "Private" class used by class UNLreport.  That class operates on
-# a whole file.  UNLreport operates on a single line structure.
+# a whole report.  UNLreport::Line operates on a single line structure.
 #
 package Data::UNLreport::Line;
 
@@ -385,13 +421,20 @@ sub new
   bless ($self, $class);    # of this class
   $self->{split_line}[0] = "";  # Just to establish this field as array
 
-  my ($in_delim, $in_split) # Just get local copies of delimiters
-    = ($p_file->{in_delim}, $p_file->{in_split});
+  #my ($in_delim, $in_split) # Just get local copies of delimiters
+  #  = ($p_file->{in_delim}, $p_file->{in_split});
+  my $in_delim = $p_file->{in_delim}; # Just get local copy of in-delimiter
+  $in_delim = qr/\|/ if ($in_delim eq "|");     # Avoid confusion cause by
+                                                # this special character
 
+  if (($in_delim eq 'b') || ($in_delim eq ' ')) # If input delimiter is
+  {                                             # white space, use this
+    $in_delim = qr/\s+/;                        # white-space pattern
+  }
   if (ref($one_line) eq "ARRAY")    # If I received an array reference
   {                                 # copy the array into line object
     @{$self->{split_line}} = @{$one_line};          #  and set the
-    $self->{columns} = $#{$self->{split_line}} + 1; # column count
+    $self->{columns} = @{$self->{split_line}};      # column count
     $self->{has_delims} = 1;        # Already separated - as good as
                                     # delimited.
   }
@@ -405,14 +448,14 @@ sub new
     # counted like a reguler UNL line.
     #
     $self->{has_delims} = 0;        # Initially assume line had no
-    if ($one_line =~ $in_split)     # delims, but if I find one,
+    if ($one_line =~ $in_delim)     # delims, but if I find one,
       {$self->{has_delims} = 1;}    # correct the assumption ASAP
   
     if ($self->{has_delims})
     {
       # Split the line but keep trailing null fields.
       #
-      @{$self->{split_line}} = split($in_split, $one_line, -1);
+      @{$self->{split_line}} = split($in_delim, $one_line, -1);
       $util->repair_esc_delims(\@{$self->{split_line}}, $in_delim);
                                     # That is, undo overzealous splits
  # 
@@ -429,7 +472,7 @@ sub new
         $p_file->{has_end_delim} = 1;   # OK if this is set repeatedly
         pop @{$self->{split_line}};     # Lose the bogus last element
       }
-      $self->{columns} = $#{$self->{split_line}} + 1;   # Column count
+      $self->{columns} = @{$self->{split_line}};    # Column count
     }
     else  # If line has no delimiters
     {
@@ -439,14 +482,14 @@ sub new
   } # End of line-splitting code
 
   # Regardless of whether I got the split record or had to split it
-  # myself, ttidy up fields by trimming leading & trailing spaces
+  # myself, tidy up fields by trimming leading & trailing spaces
   # Then track the size & formats of each field
   #
   for (my $nfield = 0;
        $nfield <= $#{$self->{split_line}};
        $nfield++)
   { 
-    $self->{split_line}[$nfield] =~ s/^\s+//;    # Trim leading
+    #$self->{split_line}[$nfield] =~ s/^\s+//;    # Trim leading #(No, dont)
     $self->{split_line}[$nfield] =~ s/\s+$//;    # Trim trailing
 
     # Now for the data types:
@@ -572,7 +615,6 @@ sub count_escapes
 
 1;
 __END__
-# Below is stub documentation for your module. You'd better edit it!
 
 =pod
 

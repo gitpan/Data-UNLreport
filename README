@@ -1,4 +1,4 @@
-Data::UNLreport version 1.04
+Data::UNLreport version 1.05
 ======================
 Author: Jacob Salomon
         jakesalomon@yahoo.com
@@ -308,7 +308,9 @@ type:
 
 --------------------------------------------------------------------------
 Bug Fixes:
-1.03 -> 1.04:
+1.03 -> 1.05:
+    (Note: Skipped 1.04 due to a failed upload of 1.04, but CPAN would
+	not let me try again with that number.)
 1.  If a columns contains both numeric and character data, the data
     column is printed at the maximume character width, even if some
     decimal data in the same column is wider.

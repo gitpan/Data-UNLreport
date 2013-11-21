@@ -76,9 +76,11 @@ if (defined($opt_values{h}))
 }
 my $in_delim  = defined($opt_values{d})
               ? $opt_values{d} : $def_in_delim;
+$in_delim = ' ' if ($in_delim eq 'b');  # User specified blank input delim
 
 my $out_delim = defined($opt_values{D})
               ? $opt_values{D} : $in_delim;
+$out_delim = ' ' if ($out_delim eq 'b');  # Specified blank output delim
 
 my $p_file = Data::UNLreport->new(); # Create the object and
 $p_file->in_delim($in_delim);   # set the input/output delimiters
